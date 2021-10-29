@@ -38,8 +38,6 @@ public:
 private:
 	DISPMANX_RESOURCE_HANDLE_T  m_pixels;
 	uint32_t 					m_ptr_pixels;
-//	uint32_t m_ptr_alpha;
-
 };
 
 #endif /* SRC_VIDEO_FRAME_H_ */

@@ -24,11 +24,11 @@ OBJECTS = $(SOURCES:$(SRC_PATH)/%.$(SRC_EXT)=$(BUILD_PATH)/%.o)
 DEPS = $(OBJECTS:.o=.d)
 
 # flags #
-COMPILE_FLAGS = -std=c++11 -Wall -Wextra -g
-INCLUDES = -I include/ -I /usr/include -I /usr/include/libdrm -I /usr/local/include
+COMPILE_FLAGS = -Wall -Wextra -g
+INCLUDES = -I/opt/vc/include -I/opt/vc/include/interface/vmcs_host/ -I/opt/vc/include/interface/vcos/pthreads -I/opt/vc/include/interface/vmcs_host/linux -I include/ -I /usr/include -I /usr/include/libdrm -I /usr/local/include
 # Space-separated pkg-config libraries used by this project
-LIBS = -lGLESv2 -lEGL -ldrm -lgbm -lndi -lpthread
-#LIBS = -L/opt/vc/lib/ -lbrcmGLESv2 -lbrcmEGL -ldrm -lgbm -lndi -lpthread
+#LIBS = -lGLESv2 -lEGL -ldrm -lgbm -lndi -lpthread
+LIBS = -L/opt/vc/lib/ -lbcm_host -lvcos -lvchiq_arm -lpthread -lndi
 
 .PHONY: default_target
 default_target: release
