@@ -43,6 +43,7 @@ private:
 
 	void discover_any_source();
 	void disconnect();
+	void cleanup();
 
 	static void poll_thread (ndi_receiver &ndi);
 	std::thread poller;
@@ -57,6 +58,7 @@ private:
 
 	uint32_t m_v_received, m_v_captured, m_v_dropped;
 	uint32_t m_a_received, m_a_captured, m_a_dropped;
+	std::chrono::high_resolution_clock::time_point m_last_v, m_last_a;
 
 	bool m_run;
 	bool m_connected;
@@ -65,7 +67,7 @@ private:
 	std::mutex m_video_lock;
 	std::mutex m_audio_lock;
 
-	static const unsigned int timeout_ms = 5000;
+	static uint32_t timeout_ms;
 
 };
 

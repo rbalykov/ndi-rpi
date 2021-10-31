@@ -10,6 +10,8 @@
 #include <iostream>
 #include <cassert>
 
+uint32_t ndi_receiver::timeout_ms = 5000;
+
 ndi_receiver::ndi_receiver()
 {
 	m_pfinder 		= NULL;
@@ -27,23 +29,11 @@ ndi_receiver::ndi_receiver()
 
 	m_v_received = m_v_captured = m_v_dropped = 0;
 	m_a_received = m_a_captured = m_a_dropped = 0;
+
 }
 
 ndi_receiver::~ndi_receiver()
 {
-	if (m_pending_video)
-	{
-		free_video(m_pending_video);
-		m_v_dropped++;
-	}
-	if (m_pending_audio)
-	{
-		free_audio(m_pending_audio);
-		m_a_dropped++;
-	}
-	if(m_pavsync) 	NDIlib_avsync_destroy(m_pavsync);
-	if(m_precv)		NDIlib_recv_destroy(m_precv);
-
 	std::cout << "Video frames received: " << m_v_received
 			  << ", captured: " << m_v_captured
 			  << ", dropped: "  << m_v_dropped << std::endl;
@@ -51,7 +41,6 @@ ndi_receiver::~ndi_receiver()
 	std::cout << "Audio frames received: " << m_a_received
 			  << ", captured: " << m_a_captured
 			  << ", dropped: "  << m_a_dropped << std::endl;
-
 }
 
 void ndi_receiver::poll()
@@ -59,6 +48,7 @@ void ndi_receiver::poll()
 	NDIlib_frame_type_e result;
 	ndi_video_t* vf = new ndi_video_t;
 	ndi_audio_t* af = new ndi_audio_t;
+	std::chrono::high_resolution_clock::time_point time_now;
 
 	if ((!vf) || (!af))
 	{
@@ -82,9 +72,25 @@ void ndi_receiver::poll()
 		pend_audio(af);
 		break;
 
-	case NDIlib_frame_type_none:
-	case NDIlib_frame_type_metadata:
 	case NDIlib_frame_type_error:
+		delete vf;
+		delete af;
+		std::cout << "NDI source disconnected, starting discovery." << std::endl;
+		disconnect();
+		break;
+
+	case NDIlib_frame_type_none:
+		time_now = std::chrono::high_resolution_clock::now();
+		if (time_now - m_last_v > std::chrono::milliseconds(timeout_ms))
+		{
+			std::cout << "NDI source timed out, starting discovery." << std::endl;
+			disconnect();
+		}
+		delete vf;
+		delete af;
+		break;
+
+	case NDIlib_frame_type_metadata:
 	case NDIlib_frame_type_status_change:
 	default:
 		delete vf;
@@ -112,7 +118,8 @@ void ndi_receiver::poll_thread (ndi_receiver &ndi)
 			ndi.poll();
 		}
 	}
-	NDIlib_destroy();
+
+	ndi.cleanup();
 	std::cout << "NDI polling stopped." << std::endl;
 }
 
@@ -153,6 +160,48 @@ void ndi_receiver::discover_any_source()
 
 	quit:
 	m_discovery_lock.unlock();
+}
+
+void ndi_receiver::disconnect()
+{
+	m_video_lock.lock();
+	if (m_pending_video)
+	{
+		NDIlib_recv_free_video_v2(m_precv, m_pending_video);
+		delete m_pending_video;
+		m_pending_video = NULL;
+		m_v_dropped++;
+	}
+	m_video_lock.unlock();
+
+	m_audio_lock.lock();
+	if (m_pending_audio)
+	{
+		NDIlib_recv_free_audio_v3(m_precv, m_pending_audio);
+		delete m_pending_audio;
+		m_pending_audio = NULL;
+		m_a_dropped++;
+	}
+	m_audio_lock.unlock();
+
+	m_discovery_lock.lock();
+	if (m_precv)
+	{
+		NDIlib_recv_destroy(m_precv);
+		m_precv = NULL;
+		m_connected = false;
+	}
+	m_discovery_lock.unlock();
+}
+
+void ndi_receiver::cleanup()
+{
+	disconnect();
+
+	if(m_pavsync) 	{ NDIlib_avsync_destroy(m_pavsync); m_pavsync = NULL; 	}
+	if(m_precv)		{ NDIlib_recv_destroy(m_precv); 	m_precv = NULL; 	}
+
+	NDIlib_destroy();
 }
 
 void ndi_receiver::start()
@@ -236,6 +285,7 @@ void ndi_receiver::pend_video(ndi_receiver::ndi_video_t* vf)
 		m_pending_video = vf;
 		m_v_dropped++;
 	}
+	m_last_v = std::chrono::high_resolution_clock::now();
 	m_video_lock.unlock();
 }
 
@@ -256,6 +306,7 @@ void ndi_receiver::pend_audio(ndi_receiver::ndi_audio_t* af)
 		m_pending_audio = af;
 		m_a_dropped++;
 	}
+	m_last_a = std::chrono::high_resolution_clock::now();
 	m_audio_lock.unlock();
 }
 
