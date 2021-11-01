@@ -17,13 +17,15 @@ ndi_receiver::ndi_receiver()
 	m_pfinder 		= NULL;
 	m_precv 		= NULL;
 	m_pavsync 		= NULL;
-	m_run 		= false;
-	m_connected = false;
-
 	m_pending_video = NULL;
 	m_pending_audio = NULL;
 
-	m_rx_desc.color_format 		= NDIlib_recv_color_format_fastest;
+	m_run 		= false;
+	m_connected = false;
+	m_quit 		= false;
+
+//	m_rx_desc.color_format 		= NDIlib_recv_color_format_fastest;
+	m_rx_desc.color_format 		=NDIlib_recv_color_format_BGRX_BGRA;
 	m_rx_desc.bandwidth 		= NDIlib_recv_bandwidth_highest;
 	m_rx_desc.p_ndi_recv_name 	= "RPI monitor";
 
@@ -81,7 +83,7 @@ void ndi_receiver::poll()
 
 	case NDIlib_frame_type_none:
 		time_now = std::chrono::high_resolution_clock::now();
-		if (time_now - m_last_v > std::chrono::milliseconds(timeout_ms))
+		if (time_now - m_last_data > std::chrono::milliseconds(timeout_ms))
 		{
 			std::cout << "NDI source timed out, starting discovery." << std::endl;
 			disconnect();
@@ -121,6 +123,7 @@ void ndi_receiver::poll_thread (ndi_receiver &ndi)
 
 	ndi.cleanup();
 	std::cout << "NDI polling stopped." << std::endl;
+	ndi.m_quit = true;
 }
 
 void ndi_receiver::discover_any_source()
@@ -210,6 +213,7 @@ void ndi_receiver::start()
 	if (m_run) goto quit;
 
 	m_run = true;
+	m_quit = false;
 	poller = std::thread(poll_thread, std::ref(*this)); // @suppress("Symbol is not resolved")
 	poller.detach();
 
@@ -226,6 +230,11 @@ void ndi_receiver::stop()
 
 	if (poller.joinable())
 		poller.join();
+
+	while(m_quit != true)
+	{
+		std::this_thread::sleep_for(std::chrono::milliseconds(10));
+	}
 }
 
 ndi_receiver::ndi_video_t* ndi_receiver::capture_video()
@@ -285,7 +294,7 @@ void ndi_receiver::pend_video(ndi_receiver::ndi_video_t* vf)
 		m_pending_video = vf;
 		m_v_dropped++;
 	}
-	m_last_v = std::chrono::high_resolution_clock::now();
+	m_last_data = std::chrono::high_resolution_clock::now();
 	m_video_lock.unlock();
 }
 
@@ -306,7 +315,7 @@ void ndi_receiver::pend_audio(ndi_receiver::ndi_audio_t* af)
 		m_pending_audio = af;
 		m_a_dropped++;
 	}
-	m_last_a = std::chrono::high_resolution_clock::now();
+	m_last_data = std::chrono::high_resolution_clock::now();
 	m_audio_lock.unlock();
 }
 

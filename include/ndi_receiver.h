@@ -14,6 +14,13 @@
 
 class ndi_receiver
 {
+public:
+	ndi_receiver();
+	virtual ~ndi_receiver();
+
+	void start();
+	void stop();
+
 	typedef NDIlib_video_frame_v2_t 	ndi_video_t;
 	typedef NDIlib_audio_frame_v3_t		ndi_audio_t;
 	typedef NDIlib_find_instance_t  	ndi_find_t;
@@ -22,13 +29,6 @@ class ndi_receiver
 	typedef NDIlib_framesync_instance_t	ndi_fsync_t;
 	typedef NDIlib_avsync_instance_t	ndi_avsync_t;
 	typedef NDIlib_source_t				ndi_src_t;
-
-public:
-	ndi_receiver();
-	virtual ~ndi_receiver();
-
-	void start();
-	void stop();
 
 	ndi_video_t* capture_video();
 	ndi_audio_t* capture_audio();
@@ -58,9 +58,10 @@ private:
 
 	uint32_t m_v_received, m_v_captured, m_v_dropped;
 	uint32_t m_a_received, m_a_captured, m_a_dropped;
-	std::chrono::high_resolution_clock::time_point m_last_v, m_last_a;
+	std::chrono::high_resolution_clock::time_point m_last_data;
 
 	bool m_run;
+	bool m_quit;
 	bool m_connected;
 
 	std::mutex m_discovery_lock;

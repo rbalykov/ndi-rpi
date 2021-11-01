@@ -16,7 +16,7 @@
 #include <exception>
 #include <string>
 #include <mutex>
-
+#include <condition_variable>
 
 
 class video_monitor
@@ -25,7 +25,11 @@ public:
 	video_monitor(bool* run);
 	virtual ~video_monitor();
 
-	int run();
+	int start();
+
+	DISPMANX_DISPLAY_HANDLE_T 	display() 	{ return m_display; };
+	const DISPMANX_MODEINFO_T* 	mode() 		{ return &m_modeinfo; };
+	DISPMANX_UPDATE_HANDLE_T 	update_handle() { return m_update; }
 
 private:
 	static void vsync_callback(DISPMANX_UPDATE_HANDLE_T u, void* arg);
@@ -35,8 +39,11 @@ private:
 	void cleanup();
 	void init_check(bool x, const char* message);
 
-	std::mutex m_lock;
+	static void render_thread (video_monitor &m);
+	std::thread m_renderer;
+
 	bool* m_run;
+	bool m_quit;
 
 	unsigned m_display_id;
 
@@ -44,7 +51,10 @@ private:
     DISPMANX_MODEINFO_T         m_modeinfo;
     DISPMANX_UPDATE_HANDLE_T    m_update;
 
+	video_frame_uyvy* m_current_frame;
     ndi_receiver m_ndi;
+
+    std::mutex m_sync_lock;
 
 
     class init_exception: public std::exception

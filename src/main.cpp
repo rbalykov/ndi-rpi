@@ -23,6 +23,6 @@ int main (int argc, char ** argv)
 	std::signal(SIGINT, sigterm_callback);
 
 	video_monitor m(&program_run);
-	return m.run();
+	return m.start();
 }
 
